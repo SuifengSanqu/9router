@@ -12,52 +12,53 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Create HF Space (if not exists)
-        env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
-        run: |
-          set -e
-          SPACE="wu549337178/9router"
-          
-          echo "📦 检查 Space 是否存在..."
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-            -H "Authorization: Bearer $HF_TOKEN" \
-            "https://huggingface.co/api/spaces/$SPACE")
-          
-          if [ "$STATUS" != "200" ]; then
-            echo "📦 创建 Space: $SPACE"
-            RESP=$(curl -s -w "\n%{http_code}" -X POST \
-              -H "Authorization: Bearer $HF_TOKEN" \
-              -H "Content-Type: application/json" \
-              -d '{"repo_id":"'"$SPACE"'","repo_type":"space","sdk":"docker","private":true}' \
-              "https://huggingface.co/api/repos/create")
-            echo "$RESP"
-          else
-            echo "✅ Space 已存在"
-          fi
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
 
-      - name: Clone fresh repo
-        run: |
-          rm -rf /tmp/9router-deploy
-          mkdir -p /tmp/9router-deploy
-          cp -r $GITHUB_WORKSPACE/* /tmp/9router-deploy/
-          
-      - name: Push to Hugging Face
-        working-directory: /tmp/9router-deploy
+      - name: Deploy to Hugging Face
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          set -e
-          git init
-          git config user.email "github-actions@github.com"
-          git config user.name "GitHub Actions"
-          git checkout -b main
-          git add .
-          git commit -m "Deploy 9router to HF Spaces" || true
-          
-          git remote add hf "https://user:${HF_TOKEN}@huggingface.co/spaces/wu549337178/9router"
-          git push -u hf main --force
-          
-          echo "✅ 部署完成！"
-          echo "📍 https://huggingface.co/spaces/wu549337178/9router"
-          echo "📊 https://wu549337178-9router.hf.space/dashboard"
+          pip install huggingface_hub
+          python3 << 'PYEOF'
+          from huggingface_hub import HfApi
+          import os
+
+          token = os.environ["HF_TOKEN"]
+          api = HfApi(token=token)
+          space_id = "wu549337178/9router"
+
+          # 获取用户名
+          user = api.whoami()
+          username = user["name"]
+          print(f"✅ 登录: {username}")
+
+          # 创建 Space
+          try:
+              api.create_repo(
+                  repo_id=space_id,
+                  repo_type="space",
+                  space_sdk="docker",
+                  private=True
+              )
+              print(f"✅ Space 创建成功")
+          except Exception as e:
+              if "409" in str(e) or "already exists" in str(e).lower():
+                  print(f"⚠️ Space 已存在，继续")
+              else:
+                  print(f"❌ 创建失败: {e}")
+
+          # 上传文件
+          api.upload_folder(
+              repo_id=space_id,
+              repo_type="space",
+              folder_path=".",
+              path_in_repo="",
+              commit_message="Deploy from GitHub Actions"
+          )
+          print(f"✅ 部署完成！")
+          print(f"📍 https://huggingface.co/spaces/{space_id}")
+          print(f"📊 https://{space_id.replace('/', '-')}.hf.space/dashboard")
+          PYEOF
