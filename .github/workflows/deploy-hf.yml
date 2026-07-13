@@ -1,0 +1,35 @@
+name: Deploy to Hugging Face Spaces
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure git
+        run: |
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+
+      - name: Deploy to Hugging Face Spaces
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          echo "📍 Deploying to: wu549337178/9router"
+          
+          # Add HF remote
+          git remote add hf "https://$HF_TOKEN@huggingface.co/spaces/wu549337178/9router"
+          
+          # Force push to HF
+          git push -u hf main --force
+          
+          echo "✅ Deployed successfully!"
+          echo "📍 https://huggingface.co/spaces/wu549337178/9router"
