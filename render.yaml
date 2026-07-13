@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: 9router
+    env: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    healthCheckPath: /dashboard
+    envVars:
+      - key: JWT_SECRET
+        value: 9router-secret-2026-render
+      - key: INITIAL_PASSWORD
+        value: 9router2026!
+      - key: HOSTNAME
+        value: 0.0.0.0
