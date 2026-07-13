@@ -2,7 +2,7 @@ name: Deploy to Hugging Face Spaces
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
@@ -11,25 +11,53 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
-      - name: Configure git
-        run: |
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git config --global user.name "github-actions[bot]"
-
-      - name: Deploy to Hugging Face Spaces
+      - name: Create HF Space (if not exists)
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          echo "📍 Deploying to: wu549337178/9router"
+          set -e
+          SPACE="wu549337178/9router"
           
-          # Add HF remote
-          git remote add hf "https://$HF_TOKEN@huggingface.co/spaces/wu549337178/9router"
+          echo "📦 检查 Space 是否存在..."
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer $HF_TOKEN" \
+            "https://huggingface.co/api/spaces/$SPACE")
           
-          # Force push to HF
+          if [ "$STATUS" != "200" ]; then
+            echo "📦 创建 Space: $SPACE"
+            RESP=$(curl -s -w "\n%{http_code}" -X POST \
+              -H "Authorization: Bearer $HF_TOKEN" \
+              -H "Content-Type: application/json" \
+              -d '{"repo_id":"'"$SPACE"'","repo_type":"space","sdk":"docker","private":true}' \
+              "https://huggingface.co/api/repos/create")
+            echo "$RESP"
+          else
+            echo "✅ Space 已存在"
+          fi
+
+      - name: Clone fresh repo
+        run: |
+          rm -rf /tmp/9router-deploy
+          mkdir -p /tmp/9router-deploy
+          cp -r $GITHUB_WORKSPACE/* /tmp/9router-deploy/
+          
+      - name: Push to Hugging Face
+        working-directory: /tmp/9router-deploy
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          set -e
+          git init
+          git config user.email "github-actions@github.com"
+          git config user.name "GitHub Actions"
+          git checkout -b main
+          git add .
+          git commit -m "Deploy 9router to HF Spaces" || true
+          
+          git remote add hf "https://user:${HF_TOKEN}@huggingface.co/spaces/wu549337178/9router"
           git push -u hf main --force
           
-          echo "✅ Deployed successfully!"
+          echo "✅ 部署完成！"
           echo "📍 https://huggingface.co/spaces/wu549337178/9router"
+          echo "📊 https://wu549337178-9router.hf.space/dashboard"
