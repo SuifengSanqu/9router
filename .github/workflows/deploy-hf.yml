@@ -12,53 +12,31 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Deploy to Hugging Face
+      - name: Create Space (if needed) and Push
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          pip install huggingface_hub
-          python3 << 'PYEOF'
-          from huggingface_hub import HfApi
-          import os
+          set -e
+          SPACE="wu549337178/9router"
 
-          token = os.environ["HF_TOKEN"]
-          api = HfApi(token=token)
-          space_id = "wu549337178/9router"
+          echo "📦 创建/检查 Space..."
+          curl -sf --connect-timeout 30 -X POST \
+            -H "Authorization: Bearer $HF_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"repo_id\":\"$SPACE\",\"repo_type\":\"space\",\"sdk\":\"docker\"}" \
+            "https://huggingface.co/api/repos/create" || true
 
-          # 获取用户名
-          user = api.whoami()
-          username = user["name"]
-          print(f"✅ 登录: {username}")
+          echo "📤 推送代码..."
+          git init
+          git config user.email "gh-actions@github.com"
+          git config user.name "GitHub Actions"
+          git checkout -b main
+          git add .
+          git commit -m "Deploy 9router" --allow-empty
+          git remote add hf "https://hf:${HF_TOKEN}@huggingface.co/spaces/${SPACE}"
+          git push -u hf main --force
 
-          # 创建 Space
-          try:
-              api.create_repo(
-                  repo_id=space_id,
-                  repo_type="space",
-                  space_sdk="docker",
-                  private=True
-              )
-              print(f"✅ Space 创建成功")
-          except Exception as e:
-              if "409" in str(e) or "already exists" in str(e).lower():
-                  print(f"⚠️ Space 已存在，继续")
-              else:
-                  print(f"❌ 创建失败: {e}")
-
-          # 上传文件
-          api.upload_folder(
-              repo_id=space_id,
-              repo_type="space",
-              folder_path=".",
-              path_in_repo="",
-              commit_message="Deploy from GitHub Actions"
-          )
-          print(f"✅ 部署完成！")
-          print(f"📍 https://huggingface.co/spaces/{space_id}")
-          print(f"📊 https://{space_id.replace('/', '-')}.hf.space/dashboard")
-          PYEOF
+          echo ""
+          echo "✅ 部署完成！"
+          echo "::notice::https://huggingface.co/spaces/wu549337178/9router"
+          echo "::notice::Dashboard: https://wu549337178-9router.hf.space/dashboard"
