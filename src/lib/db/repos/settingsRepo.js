@@ -88,9 +88,38 @@ async function seedInitialPassword(raw) {
   return next;
 }
 
+const NOAUTH_SEED_PROVIDERS = [
+  { id: "opencode", name: "OpenCode Free" },
+  { id: "mimo-free", name: "MiMo Code Free" },
+];
+
+let providerSeedDone = false;
+
+async function seedNoAuthProviders() {
+  if (providerSeedDone) return;
+  const { getProviderConnections, createProviderConnection } = await import("./connectionsRepo.js");
+  const connections = await getProviderConnections();
+  const existing = new Set(connections.map(c => c.provider));
+  for (const p of NOAUTH_SEED_PROVIDERS) {
+    if (!existing.has(p.id)) {
+      await createProviderConnection({
+        provider: p.id,
+        authType: "apikey",
+        name: p.name,
+        apiKey: "",
+        priority: 1,
+        isActive: true,
+        providerSpecificData: {},
+      });
+    }
+  }
+  providerSeedDone = true;
+}
+
 export async function getSettings() {
   const raw = await readRaw();
   const seeded = await seedInitialPassword(raw);
+  await seedNoAuthProviders();
   return mergeWithDefaults(seeded);
 }
 
