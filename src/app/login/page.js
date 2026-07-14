@@ -15,6 +15,7 @@ export default function LoginPage() {
   const [oidcLoginLabel, setOidcLoginLabel] = useState("Sign in with OIDC");
   const [mustChange, setMustChange] = useState(false);
   const [newPassword, setNewPassword] = useState("");
+  const [hasInitialPassword, setHasInitialPassword] = useState(false);
 
   // Countdown for rate-limit
   useEffect(() => {
@@ -42,6 +43,7 @@ export default function LoginPage() {
             return;
           }
           setHasPassword(!!data.hasPassword);
+          setHasInitialPassword(!!data.hasInitialPassword);
           setAuthMode(data.authMode || "password");
           setOidcConfigured(data.oidcConfigured === true);
           setOidcLoginLabel(data.oidcLoginLabel || "Sign in with OIDC");
@@ -229,7 +231,12 @@ export default function LoginPage() {
                 <p className="text-xs text-center text-text-muted mt-2">
                   Default password is <code className="bg-sidebar px-1 rounded">123456</code>
                 </p>
-                {hasPassword === false && (
+                {hasPassword === false && hasInitialPassword && (
+                  <p className="text-xs text-center text-text-muted">
+                    Password is configured via <code className="bg-sidebar px-1 rounded">INITIAL_PASSWORD</code> environment variable.
+                  </p>
+                )}
+                {hasPassword === false && !hasInitialPassword && (
                   <p className="text-xs text-center text-amber-600 dark:text-amber-400">
                     Security risk: no password set. You will be asked to set one when logging in remotely.
                   </p>

@@ -1,0 +1,30 @@
+app = "9router"
+primary_region = "nrt"
+
+[build]
+  [build.args]
+    NODE_IMAGE = "node:22-alpine"
+
+[env]
+  PORT = "20128"
+  HOSTNAME = "0.0.0.0"
+  NODE_ENV = "production"
+  DATA_DIR = "/data"
+  JWT_SECRET = "9router-secret-2026-fly"
+  INITIAL_PASSWORD = "9router2026!"
+
+[http_service]
+  internal_port = 20128
+  force_https = true
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 1
+
+[[vm]]
+  memory = "256mb"
+  cpu_kind = "shared"
+  cpus = 1
+
+[[mounts]]
+  source = "9router_data"
+  destination = "/data"

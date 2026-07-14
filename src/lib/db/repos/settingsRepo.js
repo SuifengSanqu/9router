@@ -1,5 +1,6 @@
 import { getAdapter } from "../driver.js";
 import { parseJson, stringifyJson } from "../helpers/jsonCol.js";
+import bcrypt from "bcryptjs";
 
 const DEFAULT_MITM_ROUTER_BASE = "http://localhost:20128";
 const DEFAULT_HEADROOM_URL = process.env.HEADROOM_URL || "http://localhost:8787";
@@ -73,9 +74,24 @@ function mergeWithDefaults(raw) {
   return merged;
 }
 
+async function seedInitialPassword(raw) {
+  const envPassword = process.env.INITIAL_PASSWORD;
+  if (!envPassword) return raw;
+  if (raw.password) return raw;
+  const hash = await bcrypt.hash(envPassword, 10);
+  const next = { ...raw, password: hash };
+  const db = await getAdapter();
+  db.run(
+    `INSERT INTO settings(id, data) VALUES(1, ?) ON CONFLICT(id) DO UPDATE SET data = excluded.data`,
+    [stringifyJson(next)]
+  );
+  return next;
+}
+
 export async function getSettings() {
   const raw = await readRaw();
-  return mergeWithDefaults(raw);
+  const seeded = await seedInitialPassword(raw);
+  return mergeWithDefaults(seeded);
 }
 
 // Atomic read-merge-write inside transaction (prevents losing concurrent updates)
