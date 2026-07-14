@@ -16,7 +16,28 @@ function rowToKey(row) {
 export async function getApiKeys() {
   const db = await getAdapter();
   const rows = db.all(`SELECT * FROM apiKeys ORDER BY createdAt ASC`);
-  return rows.map(rowToKey);
+  const keys = rows.map(rowToKey);
+  if (keys.length === 0 && process.env.DEFAULT_API_KEY) {
+    const seeded = await seedDefaultApiKey(db, process.env.DEFAULT_API_KEY);
+    if (seeded) return [seeded];
+  }
+  return keys;
+}
+
+async function seedDefaultApiKey(db, keyValue) {
+  const apiKey = {
+    id: uuidv4(),
+    name: "default",
+    key: keyValue,
+    machineId: "default-env",
+    isActive: true,
+    createdAt: new Date().toISOString(),
+  };
+  db.run(
+    `INSERT INTO apiKeys(id, key, name, machineId, isActive, createdAt) VALUES(?, ?, ?, ?, ?, ?)`,
+    [apiKey.id, apiKey.key, apiKey.name, apiKey.machineId, 1, apiKey.createdAt]
+  );
+  return apiKey;
 }
 
 export async function getApiKeyById(id) {
